@@ -1,6 +1,3 @@
-# Diabetes-Prediction-using-Body-Composition-Data
-
-
 # Diabetes Body Composition Data
 
 This repository contains Python scripts for analyzing the relationship between body composition and diabetes using machine learning. The code is divided into two main scripts: preprocessing.py for data preparation and postprocessing.py for model training, evaluation, and visualization.
