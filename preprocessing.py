@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Preprocessing for Diabetes Body Composition data"""
 
 import pandas as pd
