@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Postprocessing for Diabetes Body Composition Analysis"""
 
 
@@ -19,8 +18,8 @@ from sklearn.metrics import roc_curve, auc
 import plotly.express as px
 
 # Split features and target
-X = data.drop('HasDiabetes', axis=1)
-y = data['HasDiabetes']
+X = ctgan_result_df.drop('HasDiabetes', axis=1)
+y = ctgan_result_df['HasDiabetes']
 
 # Stratified K-Fold
 kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
