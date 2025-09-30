@@ -8,13 +8,15 @@ This repository contains Python scripts for analyzing the relationship between b
 # Data Preprocessing (preprocessing.py):
 Loads and explores body composition data from an Excel file.
 Handles missing values, converts data types, and scales features using MinMaxScaler.
-Generates synthetic data using CTGAN to address class imbalance.
+Handling Class Imbalance using SVM-SMOTE, Random undersampler, ADASYN, and CTGAN.
+Generates synthetic data using CTGAN to address class imbalance, and a KDE plot is applied.
+
 
 
 # Model Training and Evaluation (postprocessing.py):
 Trains multiple classifiers: MLP, Gradient Boosting, Random Forest, Logistic Regression, Decision Tree, LightGBM, XGBoost, AdaBoost, LDA, and TabNet.
 Evaluates models using metrics like AUROC, accuracy, precision, recall, F1-score, and more.
-Visualizes the ROC curve for the MLP model and a correlation heatmap for feature analysis.
+Visualizes the feature importance via SHAP and the ROC curve for the MLP model and a correlation heatmap for feature analysis.
 
 
 # Dependencies:
