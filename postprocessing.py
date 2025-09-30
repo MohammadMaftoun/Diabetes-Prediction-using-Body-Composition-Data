@@ -135,3 +135,153 @@ plt.ylabel('TPR')
 plt.title('Receiver Operating Characteristic (ROC) for MLP')
 plt.legend(loc="lower right")
 plt.show()
+
+# Convert metrics to DataFrame for analysis and plotting
+metrics_df_mlp = pd.DataFrame(metrics_all_folds['MLP'])
+
+# Calculate mean, std, and 95% CI for key metrics
+print("\nSummary of Performance Across Folds:")
+for model_name, metrics_df in [('MLP', metrics_df_mlp)]:
+    print(f"\n{model_name}:")
+    for metric in ['roc_auc', 'accuracy', 'macro_f1score']:
+        mean_val = metrics_df[metric].mean()
+        std_val = metrics_df[metric].std()
+        ci_95 = 1.96 * std_val / np.sqrt(5)  # 95% confidence interval
+        print(f"{metric.upper()}: Mean = {mean_val:.2f}%, Std = {std_val:.2f}%, 95% CI = [{mean_val - ci_95:.2f}, {mean_val + ci_95:.2f}]")
+
+# Plot 1: Bar plot of key metrics across folds for MLP
+fig_bar = go.Figure()
+for model_name, metrics_df in [('MLP', metrics_df_mlp)]:
+    for metric in ['roc_auc', 'accuracy', 'macro_f1score']:
+        fig_bar.add_trace(
+            go.Bar(
+                x=metrics_df['fold'],
+                y=metrics_df[metric],
+                name=f'{model_name} {metric.upper()}',
+                text=[f'{val:.2f}%' for val in metrics_df[metric]],
+                textposition='auto'
+            )
+        )
+fig_bar.update_layout(
+    title='MLP Performance Metrics Across Folds',
+    xaxis_title='Fold',
+    yaxis_title='Metric Value (%)',
+    barmode='group',
+    plot_bgcolor='white',
+    paper_bgcolor='white',
+    showlegend=True
+)
+fig_bar.show()
+
+# Plot 2: Box plot of key metrics across folds for MLP
+fig_box = go.Figure()
+for model_name, metrics_df in [('MLP', metrics_df_mlp)]:
+    for metric in ['roc_auc', 'accuracy', 'macro_f1score']:
+        fig_box.add_trace(
+            go.Box(
+                y=metrics_df[metric],
+                name=f'{model_name} {metric.upper()}',
+                boxpoints='all',
+                jitter=0.3,
+                pointpos=-1.8
+            )
+        )
+fig_box.update_layout(
+    title='Distribution of MLP Performance Metrics Across Folds',
+    yaxis_title='Metric Value (%)',
+    plot_bgcolor='white',
+    paper_bgcolor='white',
+    showlegend=True
+)
+fig_box.show()
+
+
+
+# =============================================================================
+# COMPREHENSIVE SHAP ANALYSIS - ALL FEATURES
+# =============================================================================
+
+print(f"\n🔄 Computing SHAP values for ALL {X.shape[1]} features...")
+print("This will take a few minutes but will show complete feature analysis...")
+
+# Optimized SHAP computation
+background_size = 150  # Increased for better baseline
+test_sample_size = 300  # Increased for better representation
+
+# Create background dataset
+background = shap.sample(X_train, background_size, random_state=42)
+X_test_shap = shap.sample(X_test, test_sample_size, random_state=42)
+
+# Create SHAP explainer
+explainer = shap.KernelExplainer(model.predict_proba, background, link="logit")
+
+# Calculate SHAP values
+shap_values = explainer.shap_values(X_test_shap)
+
+# Handle binary classification and ensure proper dimensions
+if isinstance(shap_values, list):
+    shap_values_pos = shap_values[1]  # Positive class
+    expected_value = explainer.expected_value[1] if isinstance(explainer.expected_value, list) else explainer.expected_value
+else:
+    shap_values_pos = shap_values
+    expected_value = explainer.expected_value
+
+# Ensure shap_values_pos is 2D array
+if shap_values_pos.ndim != 2:
+    print(f"Warning: SHAP values have unexpected shape: {shap_values_pos.shape}")
+    # Try to reshape if needed
+    if len(shap_values_pos.shape) == 3:
+        shap_values_pos = shap_values_pos.reshape(shap_values_pos.shape[0], -1)
+
+print("✅ SHAP computation completed!")
+print(f"SHAP values shape: {shap_values_pos.shape}")
+print(f"Number of features: {X.shape[1]}")
+
+# =============================================================================
+# VISUALIZATION 1: COMPREHENSIVE FEATURE IMPORTANCE BAR PLOT
+# =============================================================================
+
+# Calculate mean absolute SHAP values for all features
+feature_importance = np.abs(shap_values_pos).mean(axis=0)
+feature_names = X.columns.tolist()
+
+# Ensure dimensions match
+if len(feature_importance) != len(feature_names):
+    print(f"Dimension mismatch! Features: {len(feature_names)}, Importance: {len(feature_importance)}")
+    # Take only the matching number of features
+    min_len = min(len(feature_names), len(feature_importance))
+    feature_names = feature_names[:min_len]
+    feature_importance = feature_importance[:min_len]
+
+print(f"Creating importance dataframe with {len(feature_names)} features")
+
+# Create importance dataframe
+importance_df = pd.DataFrame({
+    'Feature': feature_names,
+    'Importance': feature_importance.flatten()  # Ensure 1D array
+}).sort_values('Importance', ascending=True)
+
+# Enhanced bar plot showing ALL features
+plt.figure(figsize=(14, max(8, len(feature_names) * 0.4)))
+colors = plt.cm.viridis(np.linspace(0, 1, len(feature_names)))
+bars = plt.barh(importance_df['Feature'], importance_df['Importance'], color=colors)
+
+plt.title(f'🎯 SHAP Feature Importance - ALL {len(feature_names)} Features\nDiabetes Prediction Model',
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Mean |SHAP Value| (Feature Importance)', fontsize=12, fontweight='bold')
+plt.ylabel('Features', fontsize=12, fontweight='bold')
+
+# Add value labels on bars
+for i, (bar, value) in enumerate(zip(bars, importance_df['Importance'])):
+    plt.text(value + max(importance_df['Importance']) * 0.01, bar.get_y() + bar.get_height()/2,
+             f'{value:.4f}', ha='left', va='center', fontweight='bold', fontsize=9)
+
+plt.grid(axis='x', alpha=0.3)
+plt.tight_layout()
+plt.show()
+
+# Print ranking
+print(f"\n📊 FEATURE IMPORTANCE RANKING (All {len(feature_names)} features):")
+print("="*60)
+for i, (_, row) in enumerate(importance_df.iloc[::-1].iterrows(), 1):
+    print(f"{i:2d}. {row['Feature']:20} | Importance: {row['Importance']:.6f}")
