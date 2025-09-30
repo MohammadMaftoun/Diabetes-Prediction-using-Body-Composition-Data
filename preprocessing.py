@@ -65,6 +65,86 @@ if duplicate_columns:
 # Combine scaled and excluded data
 final_df = pd.concat([scaled_df, excluded_data.reset_index(drop=True)], axis=1)
 
+# fixing class imbalance problem
+import pandas as pd
+from imblearn.over_sampling import SVMSMOTE, ADASYN
+from imblearn.under_sampling import RandomUnderSampler
+from ctgan import CTGAN
+
+def balance_final_df(final_df, method="svmsmote", cat_features=None, epochs=200, random_state=42):
+    """
+    Balance final_df directly (no manual X, y separation).
+    Assumes target column is 'HasDiabetes'.
+
+    Parameters:
+    -----------
+    final_df : pd.DataFrame
+        Input dataframe with target column 'HasDiabetes'
+    method : str
+        One of ["svmsmote", "adasyn", "randomundersampler", "ctgan"]
+    cat_features : list
+        List of categorical features (needed for CTGAN)
+    epochs : int
+        Number of training epochs for CTGAN
+    random_state : int
+        Random state for reproducibility
+
+    Returns:
+    --------
+    balanced_df : pd.DataFrame
+        Balanced dataframe including target column
+    """
+
+    if "HasDiabetes" not in final_df.columns:
+        raise ValueError("final_df must contain 'HasDiabetes' as target column.")
+
+    if method.lower() in ["svmsmote", "adasyn", "randomundersampler"]:
+        # split internally just for sampler, but return as full df
+        X = final_df.drop(columns=["HasDiabetes"])
+        y = final_df["HasDiabetes"]
+
+        if method.lower() == "svmsmote":
+            sampler = SVMSMOTE(random_state=random_state)
+        elif method.lower() == "adasyn":
+            sampler = ADASYN(random_state=random_state)
+        else:  # randomundersampler
+            sampler = RandomUnderSampler(random_state=random_state)
+
+        X_res, y_res = sampler.fit_resample(X, y)
+        balanced_df = pd.concat([pd.DataFrame(X_res, columns=X.columns),
+                                 pd.Series(y_res, name="HasDiabetes")], axis=1)
+
+    elif method.lower() == "ctgan":
+        if cat_features is None:
+            raise ValueError("cat_features list must be provided for CTGAN.")
+
+        df = final_df.copy()
+        ctgan = CTGAN(verbose=True, epochs=epochs)
+        ctgan.fit(df, cat_features)
+
+        counts = df["HasDiabetes"].value_counts()
+        max_class = counts.max()
+        gen_samples = []
+
+        for cls, count in counts.items():
+            n_to_generate = max_class - count
+            if n_to_generate > 0:
+                gen_df = ctgan.sample(n_to_generate)
+                gen_df = gen_df[gen_df["HasDiabetes"] == cls]
+                gen_samples.append(gen_df)
+
+        if gen_samples:
+            gen_df = pd.concat(gen_samples, axis=0)
+            balanced_df = pd.concat([df, gen_df], axis=0).reset_index(drop=True)
+        else:
+            balanced_df = df.copy()
+
+    else:
+        raise ValueError("Method must be one of ['svmsmote', 'adasyn', 'randomundersampler', 'ctgan']")
+
+    return balanced_df
+
+
 # Synthetic data generation with CTGAN
 cat_feature = ['GenderID', 'HasDiabetes']
 ctgan = CTGAN(verbose=True)
@@ -129,3 +209,4 @@ plot_distributions(final_df, samples, key_features)
 # Print value counts
 print("\nHasDiabetes value counts in final dataset:")
 print(ctgan_result_df['HasDiabetes'].value_counts())
+
